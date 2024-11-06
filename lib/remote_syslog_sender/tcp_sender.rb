@@ -18,6 +18,9 @@ module RemoteSyslogSender
       @ssl_max_version = options[:ssl_max_version]
       @ca_file         = options[:ca_file]
       @verify_mode     = options[:verify_mode]
+      @client_cert     = options[:client_cert]
+      @client_cert_key = options[:client_cert_key]
+      @client_cert_key_pass = options[:client_cert_key_pass]
       @timeout         = options[:timeout] || 600
       @timeout_exception   = !!options[:timeout_exception]
       @exponential_backoff = !!options[:exponential_backoff]
@@ -108,6 +111,8 @@ module RemoteSyslogSender
             end
             context.ca_file = @ca_file if @ca_file
             context.verify_mode = @verify_mode if @verify_mode
+            context.cert = OpenSSL::X509::Certificate.new(File.open(@client_cert) { |f| f.read }) if @client_cert
+            context.key = OpenSSL::PKey::RSA.new(File.open(@client_cert_key) { |f| f.read }, @client_cert_key_pass) if @client_cert_key
 
             @socket = OpenSSL::SSL::SSLSocket.new(@tcp_socket, context)
             @socket.connect
