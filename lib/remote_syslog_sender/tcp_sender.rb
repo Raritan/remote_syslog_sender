@@ -21,6 +21,7 @@ module RemoteSyslogSender
       @timeout         = options[:timeout] || 600
       @timeout_exception   = !!options[:timeout_exception]
       @exponential_backoff = !!options[:exponential_backoff]
+      @tcp_user_timeout = options[:tcp_user_timeout]
 
       @mutex = Mutex.new
       @tcp_socket = nil
@@ -56,6 +57,8 @@ module RemoteSyslogSender
           close
 
           @tcp_socket = TCPSocket.new(@remote_hostname, @remote_port)
+
+          @tcp_socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_USER_TIMEOUT, @tcp_user_timeout) if @tcp_user_timeout
 
           if @keep_alive
             @tcp_socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
