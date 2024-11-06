@@ -4,7 +4,14 @@ require 'syslog_protocol'
 module RemoteSyslogSender
   class Sender
     # To suppress initialize warning
-    class Packet < SyslogProtocol::Packet
+    class LegacyPacket < SyslogProtocol::Packet
+      def initialize(*)
+        super
+        @time = nil
+      end
+    end
+
+    class Packet < SyslogProtocol::SyslogRfc5424Packet
       def initialize(*)
         super
         @time = nil
@@ -20,7 +27,7 @@ module RemoteSyslogSender
       @whinyerrors     = options[:whinyerrors]
       @packet_size     = options[:packet_size] || 1024
 
-      @packet = Packet.new
+      @packet          = options[:legacy_format] ? LegacyPacket.new : Packet.new
 
       local_hostname   = options[:hostname] || options[:local_hostname] || (Socket.gethostname rescue `hostname`.chomp)
       local_hostname   = 'localhost' if local_hostname.nil? || local_hostname.empty?
