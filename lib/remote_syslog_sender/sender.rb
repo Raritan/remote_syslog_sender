@@ -22,20 +22,26 @@ module RemoteSyslogSender
     attr_accessor :packet
 
     def initialize(remote_hostname, remote_port, options = {})
-      @remote_hostname = remote_hostname
-      @remote_port     = remote_port
-      @whinyerrors     = options[:whinyerrors]
-      @packet_size     = options[:packet_size] || 1024
+      @remote_hostname  = remote_hostname
+      @remote_port      = remote_port
+      @whinyerrors      = options[:whinyerrors]
+      @packet_size      = options[:packet_size] || 1024
+      @legacy_format    = !!options[:legacy_format]
 
-      @packet          = options[:legacy_format] ? LegacyPacket.new : Packet.new
+      @packet           = @legacy_format ? LegacyPacket.new : Packet.new
 
-      local_hostname   = options[:hostname] || options[:local_hostname] || (Socket.gethostname rescue `hostname`.chomp)
-      local_hostname   = 'localhost' if local_hostname.nil? || local_hostname.empty?
-      @packet.hostname = local_hostname
+      local_hostname    = options[:hostname] || options[:local_hostname] || (Socket.gethostname rescue `hostname`.chomp)
+      local_hostname    = 'localhost' if local_hostname.nil? || local_hostname.empty?
+      @packet.hostname  = local_hostname
 
-      @packet.facility = options[:facility] || 'user'
-      @packet.severity = options[:severity] || 'notice'
-      @packet.tag      = options[:tag] || options[:program]  || "#{File.basename($0)}[#{$$}]"
+      @packet.facility  = options[:facility] || 'user'
+      @packet.severity  = options[:severity] || 'notice'
+      @packet.tag       = options[:tag] || options[:program]  || "#{File.basename($0)}[#{$$}]"
+      unless @legacy_format
+        @packet.appname = options[:appname] || options[:program]  || "#{File.basename($0)}[#{$$}]"
+        @packet.procid  = options[:procid] || "-"
+        @packet.msgid   = options[:msgid] || "-"
+      end
 
       @socket = nil
     end
@@ -50,6 +56,11 @@ module RemoteSyslogSender
             packet.hostname = packet_options[:local_hostname] if packet_options[:local_hostname]
             %i(hostname facility severity tag time).each do |key|
               packet.send("#{key}=", packet_options[key]) if packet_options[key]
+            end
+            unless @legacy_format
+              %i(appname procid msgid).each do |key|
+                packet.send("#{key}=", packet_options[key]) if packet_options[key]
+              end
             end
           end
           packet.content = line
