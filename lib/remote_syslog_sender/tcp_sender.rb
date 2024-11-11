@@ -13,7 +13,7 @@ module RemoteSyslogSender
       @retry_interval  = options[:retry_interval] || 0.5
       @remote_hostname = remote_hostname
       @remote_port     = remote_port
-      @ssl_method      = options[:ssl_method] || 'TLSv1_2'
+      @ssl_method      = options[:ssl_method] || :TLSv1_2
       @ssl_min_version = options[:ssl_min_version]
       @ssl_max_version = options[:ssl_max_version]
       @ca_file         = options[:ca_file]
@@ -80,7 +80,7 @@ module RemoteSyslogSender
                 TLSv1_1: OpenSSL::SSL::TLS1_1_VERSION,
                 TLSv1_2: OpenSSL::SSL::TLS1_2_VERSION
               }
-              tls_versions_map[:'TLSv1_3'] = OpenSSL::SSL::TLS1_3_VERSION if defined?(OpenSSL::SSL::TLS1_3_VERSION)
+              tls_versions_map[:TLSv1_3] = OpenSSL::SSL::TLS1_3_VERSION if defined?(OpenSSL::SSL::TLS1_3_VERSION)
             rescue NameError
               # ruby 2.4 doesn't have OpenSSL::SSL::TLSXXX constants and min_version=/max_version= methods
               tls_versions_map = {
@@ -92,22 +92,11 @@ module RemoteSyslogSender
             end
 
             context = OpenSSL::SSL::SSLContext.new()
-            if min_max_available
-              case
-              when @ssl_min_version && @ssl_max_version
-                context.min_version = @ssl_min_version
-                context.max_version = @ssl_max_version
-              when (!@ssl_min_version && @ssl_max_version) || (@ssl_min_version && !@ssl_max_version)
-                raise "Both :ssl_min_version and :ssl_max_version must be set if one is"
-              when !@ssl_min_version && !@ssl_max_version
-                # Keep the current behaviour
-                context.ssl_version = METHODS_MAP[@ssl_method] || @ssl_method
-              else
-                context.min_version = tls_versions_map[@ssl_min_version] || @ssl_min_version
-                context.max_version = tls_versions_map[@ssl_max_version] || @ssl_max_version
-              end
+            if min_max_available && @ssl_min_version && @ssl_max_version
+              context.min_version = tls_versions_map[@ssl_min_version] || @ssl_min_version
+              context.max_version = tls_versions_map[@ssl_max_version] || @ssl_max_version
             else
-              context.ssl_version = METHODS_MAP[@ssl_method] || @ssl_method
+              context.ssl_version = tls_versions_map[@ssl_method] || @ssl_method
             end
             context.ca_file = @ca_file if @ca_file
             context.verify_mode = @verify_mode if @verify_mode
