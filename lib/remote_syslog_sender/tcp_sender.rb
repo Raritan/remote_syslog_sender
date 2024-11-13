@@ -1,4 +1,5 @@
 require 'socket'
+require 'timeout'
 require 'syslog_protocol'
 require 'remote_syslog_sender/sender'
 
@@ -52,14 +53,20 @@ module RemoteSyslogSender
     private
 
     def connect
-      connect_retry_count = 0
-      connect_retry_limit = 3
-      connect_retry_interval = 1
+      connect_retry_count = 1
+      connect_retry_limit = @retry_limit
+      connect_retry_interval = @retry_interval
       @mutex.synchronize do
         begin
           close
 
-          @tcp_socket = TCPSocket.new(@remote_hostname, @remote_port)
+          if @timeout && @timeout >= 0
+            Timeout.timeout(@timeout) do
+              @tcp_socket = TCPSocket.new(@remote_hostname, @remote_port)
+            end
+          else
+            @tcp_socket = TCPSocket.new(@remote_hostname, @remote_port)
+          end
 
           @tcp_socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_USER_TIMEOUT, @tcp_user_timeout) if @tcp_user_timeout
 
@@ -104,7 +111,13 @@ module RemoteSyslogSender
             context.key = OpenSSL::PKey::RSA.new(File.open(@client_cert_key) { |f| f.read }, @client_cert_key_pass) if @client_cert_key
 
             @socket = OpenSSL::SSL::SSLSocket.new(@tcp_socket, context)
-            @socket.connect
+            if @timeout && @timeout >= 0
+              Timeout.timeout(@timeout) do
+                @socket.connect
+              end
+            else
+              @socket.connect
+            end
             if @verify_mode != OpenSSL::SSL::VERIFY_NONE
               @socket.post_connection_check(@remote_hostname)
               raise "verification error" if @socket.verify_result != OpenSSL::X509::V_OK
