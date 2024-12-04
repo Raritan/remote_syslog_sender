@@ -138,7 +138,9 @@ module RemoteSyslogSender
     end
 
     def send_msg(payload)
-      if @timeout && @timeout >= 0
+      if @tls
+        method = :syswrite
+      elsif @timeout && @timeout >= 0
         method = :write_nonblock
       else
         method = :write
@@ -155,7 +157,15 @@ module RemoteSyslogSender
       until payload_size <= 0
         start = get_time
         begin
-          result = @mutex.synchronize { @socket.__send__(method, payload) }
+          result = @mutex.synchronize do
+            if @tls && @timeout && @timeout >= 0
+              Timeout.timeout(@timeout) do
+                @socket.__send__(method, payload)
+              end
+            else
+              @socket.__send__(method, payload)
+            end
+          end
           payload_size -= result
           payload.slice!(0, result) if payload_size > 0
         rescue IO::WaitReadable

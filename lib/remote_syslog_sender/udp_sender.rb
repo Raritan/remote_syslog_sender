@@ -6,7 +6,14 @@ module RemoteSyslogSender
   class UdpSender < Sender
     def initialize(remote_hostname, remote_port, options = {})
       super
-      @socket = UDPSocket.new
+      type = Socket::AF_INET
+      begin
+        ip = IPAddr.new(remote_hostname)
+        type = Socket::AF_INET6 if ip.ipv6?
+      rescue IPAddr::Error
+        # ignore
+      end
+      @socket = UDPSocket.new(type)
     end
 
     private
